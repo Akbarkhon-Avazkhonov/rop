@@ -210,7 +210,7 @@ const App: FC<StateProps> = ({
   return (
     <UiLoader page={page} isMobile={isMobile}>
       <Transition
-        name="fade"
+        name="none"
         activeKey={activeKey}
         shouldCleanup
         className={buildClassName(

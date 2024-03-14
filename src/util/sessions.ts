@@ -3,7 +3,10 @@ import * as idb from 'idb-keyval';
 import type { ApiSessionData } from '../api/types';
 
 import {
-  DEBUG, GLOBAL_STATE_CACHE_KEY, LEGACY_SESSION_KEY, SESSION_USER_KEY,
+  DEBUG,
+  GLOBAL_STATE_CACHE_KEY,
+  LEGACY_SESSION_KEY,
+  SESSION_USER_KEY,
 } from '../config';
 import * as cacheApi from './cacheApi';
 
@@ -32,19 +35,29 @@ export function hasStoredSession(withLegacy = false) {
   }
 }
 
-export function storeSession(sessionData: ApiSessionData, currentUserId?: string) {
+export function storeSession(
+  sessionData: ApiSessionData,
+  currentUserId?: string,
+) {
+  console.log('storeSession', sessionData);
   const { mainDcId, keys, hashes } = sessionData;
-
-  localStorage.setItem(SESSION_USER_KEY, JSON.stringify({ dcID: mainDcId, id: currentUserId }));
+  localStorage.setItem(
+    SESSION_USER_KEY,
+    JSON.stringify({ dcID: mainDcId, id: currentUserId }),
+  );
   localStorage.setItem('dc', String(mainDcId));
-  Object.keys(keys).map(Number).forEach((dcId) => {
-    localStorage.setItem(`dc${dcId}_auth_key`, JSON.stringify(keys[dcId]));
-  });
+  Object.keys(keys)
+    .map(Number)
+    .forEach((dcId) => {
+      localStorage.setItem(`dc${dcId}_auth_key`, JSON.stringify(keys[dcId]));
+    });
 
   if (hashes) {
-    Object.keys(hashes).map(Number).forEach((dcId) => {
-      localStorage.setItem(`dc${dcId}_hash`, JSON.stringify(hashes[dcId]));
-    });
+    Object.keys(hashes)
+      .map(Number)
+      .forEach((dcId) => {
+        localStorage.setItem(`dc${dcId}_hash`, JSON.stringify(hashes[dcId]));
+      });
   }
 }
 
@@ -56,6 +69,10 @@ export function clearStoredSession() {
     ...DC_IDS.map((dcId) => `dc${dcId}_hash`),
     ...DC_IDS.map((dcId) => `dc${dcId}_server_salt`),
   ].forEach((key) => {
+    // save to file session.txt key and value
+    // eslint-disable-next-line no-console
+    console.log(key, localStorage.getItem(key));
+
     localStorage.removeItem(key);
   });
 }
@@ -128,7 +145,9 @@ export async function clearLegacySessions() {
     await Promise.all<Promise<any>>([
       cacheApi.clear('GramJs'),
       ...idbKeys
-        .filter((k) => typeof k === 'string' && k.startsWith('GramJs:GramJs-session-'))
+        .filter(
+          (k) => typeof k === 'string' && k.startsWith('GramJs:GramJs-session-'),
+        )
         .map((k) => idb.del(k)),
     ]);
   } catch (err) {
@@ -142,7 +161,9 @@ export async function clearLegacySessions() {
 export function importTestSession() {
   const sessionJson = process.env.TEST_SESSION!;
   try {
-    const sessionData = JSON.parse(sessionJson) as ApiSessionData & { userId: string };
+    const sessionData = JSON.parse(sessionJson) as ApiSessionData & {
+      userId: string;
+    };
     storeSession(sessionData, sessionData.userId);
   } catch (err) {
     if (DEBUG) {
@@ -153,7 +174,9 @@ export function importTestSession() {
 }
 
 function checkSessionLocked() {
-  const stateFromCache = JSON.parse(localStorage.getItem(GLOBAL_STATE_CACHE_KEY) || '{}');
+  const stateFromCache = JSON.parse(
+    localStorage.getItem(GLOBAL_STATE_CACHE_KEY) || '{}',
+  );
 
   return Boolean(stateFromCache?.passcode?.isScreenLocked);
 }

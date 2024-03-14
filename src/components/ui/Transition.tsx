@@ -43,6 +43,7 @@ export type TransitionProps = {
   className?: string;
   slideClassName?: string;
   withSwipeControl?: boolean;
+  skipAnimation?: boolean;
   onStart?: NoneToVoidFunction;
   onStop?: NoneToVoidFunction;
   children: React.ReactNode | ChildrenFn;
@@ -82,6 +83,7 @@ function Transition({
   className,
   slideClassName,
   withSwipeControl,
+  skipAnimation,
   onStart,
   onStop,
   children,
@@ -204,7 +206,7 @@ function Transition({
       return;
     }
 
-    if (name === 'none' || shouldDisableAnimation || isSwipeJustCancelledRef.current) {
+    if (name === 'none' || shouldDisableAnimation || isSwipeJustCancelledRef.current || skipAnimation) {
       if (isSwipeJustCancelledRef.current) {
         isSwipeJustCancelledRef.current = false;
       }
@@ -300,25 +302,7 @@ function Transition({
     } else {
       onAnimationEnd();
     }
-  }, [
-    activeKey,
-    nextKey,
-    prevActiveKey,
-    hasActiveKeyChanged,
-    isBackwards,
-    name,
-    onStart,
-    onStop,
-    renderCount,
-    shouldRestoreHeight,
-    shouldCleanup,
-    slideClassName,
-    cleanupExceptionKey,
-    shouldDisableAnimation,
-    forceUpdate,
-    withSwipeControl,
-    cleanupOnlyKey,
-  ]);
+  }, [activeKey, nextKey, prevActiveKey, hasActiveKeyChanged, isBackwards, name, onStart, onStop, renderCount, shouldRestoreHeight, shouldCleanup, slideClassName, cleanupExceptionKey, shouldDisableAnimation, forceUpdate, withSwipeControl, cleanupOnlyKey, skipAnimation]);
 
   useEffect(() => {
     if (!shouldRestoreHeight) {

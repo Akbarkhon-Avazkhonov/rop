@@ -163,12 +163,7 @@ const LeftSideMenuItems = ({
           onMenuClosed={onBotMenuClosed}
         />
       ))}
-      <MenuItem
-        icon="play-story"
-        onClick={handleOpenMyStories}
-      >
-        {lang('Settings.MyStories')}
-      </MenuItem>
+
       <MenuItem
         icon="settings"
         onClick={onSelectSettings}
@@ -194,44 +189,7 @@ const LeftSideMenuItems = ({
         <span className="menu-item-name capitalize">{lang('Appearance.Animations').toLowerCase()}</span>
         <Toggle value={animationLevelValue} />
       </MenuItem>
-      <MenuItem
-        icon="help"
-        onClick={handleOpenTipsChat}
-      >
-        {lang('TelegramFeatures')}
-      </MenuItem>
-      <MenuItem
-        icon="bug"
-        onClick={handleBugReportClick}
-      >
-        Report Bug
-      </MenuItem>
-      {IS_BETA && (
-        <MenuItem
-          icon="permissions"
-          onClick={handleChangelogClick}
-        >
-          Beta Changelog
-        </MenuItem>
-      )}
-      {withOtherVersions && (
-        <MenuItem
-          icon="K"
-          isCharIcon
-          href={`${WEB_VERSION_BASE}k`}
-          onClick={handleSwitchToWebK}
-        >
-          Switch to K Version
-        </MenuItem>
-      )}
-      {canInstall && (
-        <MenuItem
-          icon="install"
-          onClick={getPromptInstall()}
-        >
-          Install App
-        </MenuItem>
-      )}
+
     </>
   );
 };

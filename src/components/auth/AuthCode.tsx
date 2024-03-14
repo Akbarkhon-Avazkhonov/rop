@@ -91,12 +91,7 @@ const AuthCode: FC<StateProps> = ({
   return (
     <div id="auth-code-form" className="custom-scroll">
       <div className="auth-form">
-        <TrackingMonkey
-          code={code}
-          codeLength={CODE_LENGTH}
-          isTracking={isTracking}
-          trackingDirection={trackingDirection}
-        />
+
         <h1>
           {authPhoneNumber}
           <div
@@ -110,9 +105,6 @@ const AuthCode: FC<StateProps> = ({
             <i className="icon icon-edit" />
           </div>
         </h1>
-        <p className="note">
-          {renderText(lang(authIsCodeViaApp ? 'SentAppCode' : 'Login.JustSentSms'), ['simple_markdown'])}
-        </p>
         <InputText
           ref={inputRef}
           id="sign-in-code"

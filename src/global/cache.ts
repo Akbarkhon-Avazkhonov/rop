@@ -1,8 +1,9 @@
+/* eslint-disable global-require */
 /* eslint-disable eslint-multitab-tt/no-immediate-global */
-import { addCallback, removeCallback } from '../lib/teact/teactn';
+import { addCallback, removeCallback } from "../lib/teact/teactn";
 
-import type { ActionReturnType, GlobalState, MessageList } from './types';
-import { MAIN_THREAD_ID } from '../api/types';
+import type { ActionReturnType, GlobalState, MessageList } from "./types";
+import { MAIN_THREAD_ID } from "../api/types";
 
 import {
   ALL_FOLDER_ID,
@@ -17,18 +18,20 @@ import {
   GLOBAL_STATE_CACHE_KEY,
   GLOBAL_STATE_CACHE_USER_LIST_LIMIT,
   SAVED_FOLDER_ID,
-} from '../config';
-import { getOrderedIds } from '../util/folderManager';
+} from "../config";
+import { getOrderedIds } from "../util/folderManager";
+import { compact, pick, pickTruthy, unique } from "../util/iteratees";
+import { encryptSession } from "../util/passcode";
+import { onBeforeUnload, onIdle, throttle } from "../util/schedulers";
+import { hasStoredSession } from "../util/sessions";
+import { isUserId } from "./helpers";
+import { addActionHandler, getGlobal } from "./index";
 import {
-  compact, pick, pickTruthy, unique,
-} from '../util/iteratees';
-import { encryptSession } from '../util/passcode';
-import { onBeforeUnload, onIdle, throttle } from '../util/schedulers';
-import { hasStoredSession } from '../util/sessions';
-import { isUserId } from './helpers';
-import { addActionHandler, getGlobal } from './index';
-import { INITIAL_GLOBAL_STATE, INITIAL_PERFORMANCE_STATE_MID, INITIAL_PERFORMANCE_STATE_MIN } from './initialState';
-import { clearGlobalForLockScreen } from './reducers';
+  INITIAL_GLOBAL_STATE,
+  INITIAL_PERFORMANCE_STATE_MID,
+  INITIAL_PERFORMANCE_STATE_MIN,
+} from "./initialState";
+import { clearGlobalForLockScreen } from "./reducers";
 import {
   selectChat,
   selectChatLastMessageId,
@@ -36,14 +39,18 @@ import {
   selectCurrentMessageList,
   selectViewportIds,
   selectVisibleUsers,
-} from './selectors';
+} from "./selectors";
 
-import { getIsMobile } from '../hooks/useAppLayout';
-import { isHeavyAnimating } from '../hooks/useHeavyAnimationCheck';
+import { getIsMobile } from "../hooks/useAppLayout";
+import { isHeavyAnimating } from "../hooks/useHeavyAnimationCheck";
 
 const UPDATE_THROTTLE = 5000;
 
-const updateCacheThrottled = throttle(() => onIdle(updateCache), UPDATE_THROTTLE, false);
+const updateCacheThrottled = throttle(
+  () => onIdle(updateCache),
+  UPDATE_THROTTLE,
+  false
+);
 
 let isCaching = false;
 let unsubscribeFromBeforeUnload: NoneToVoidFunction | undefined;
@@ -63,7 +70,7 @@ export function initCache() {
     clearCaching();
   };
 
-  addActionHandler('saveSession', (): ActionReturnType => {
+  addActionHandler("saveSession", (): ActionReturnType => {
     if (isCaching) {
       return;
     }
@@ -71,7 +78,7 @@ export function initCache() {
     setupCaching();
   });
 
-  addActionHandler('reset', resetCache);
+  addActionHandler("reset", resetCache);
 }
 
 export function loadCache(initialState: GlobalState): GlobalState | undefined {
@@ -95,14 +102,14 @@ export function loadCache(initialState: GlobalState): GlobalState | undefined {
 export function setupCaching() {
   isCaching = true;
   unsubscribeFromBeforeUnload = onBeforeUnload(updateCache, true);
-  window.addEventListener('blur', updateCache);
+  window.addEventListener("blur", updateCache);
   addCallback(updateCacheThrottled);
 }
 
 export function clearCaching() {
   isCaching = false;
   removeCallback(updateCacheThrottled);
-  window.removeEventListener('blur', updateCache);
+  window.removeEventListener("blur", updateCache);
   if (unsubscribeFromBeforeUnload) {
     unsubscribeFromBeforeUnload();
   }
@@ -111,15 +118,15 @@ export function clearCaching() {
 function readCache(initialState: GlobalState): GlobalState {
   if (DEBUG) {
     // eslint-disable-next-line no-console
-    console.time('global-state-cache-read');
+    console.time("global-state-cache-read");
   }
 
   const json = localStorage.getItem(GLOBAL_STATE_CACHE_KEY);
-  const cached = json ? JSON.parse(json) as GlobalState : undefined;
+  const cached = json ? (JSON.parse(json) as GlobalState) : undefined;
 
   if (DEBUG) {
     // eslint-disable-next-line no-console
-    console.timeEnd('global-state-cache-read');
+    console.timeEnd("global-state-cache-read");
   }
 
   if (cached) {
@@ -180,13 +187,15 @@ function unsafeMigrateCache(cached: GlobalState, initialState: GlobalState) {
     cached.appConfig.limits = DEFAULT_LIMITS;
   }
 
-  if (typeof cached.config?.defaultReaction === 'string') {
+  if (typeof cached.config?.defaultReaction === "string") {
     cached.config.defaultReaction = { emoticon: cached.config.defaultReaction };
   }
 
-  if (typeof cached.availableReactions?.[0].reaction === 'string') {
-    cached.availableReactions = cached.availableReactions
-      .map((r) => ({ ...r, reaction: { emoticon: r.reaction as unknown as string } }));
+  if (typeof cached.availableReactions?.[0].reaction === "string") {
+    cached.availableReactions = cached.availableReactions.map((r) => ({
+      ...r,
+      reaction: { emoticon: r.reaction as unknown as string },
+    }));
   }
 
   if (!cached.archiveSettings) {
@@ -235,12 +244,15 @@ export function forceUpdateCache(noEncrypt = false) {
   const { hasPasscode, isScreenLocked } = global.passcode;
   const serializedGlobal = serializeGlobal(global);
 
+  console.log(GLOBAL_STATE_CACHE_KEY, serializedGlobal);
   if (hasPasscode) {
     if (!isScreenLocked && !noEncrypt) {
       void encryptSession(undefined, serializedGlobal);
     }
 
-    const serializedGlobalClean = JSON.stringify(clearGlobalForLockScreen(global, false));
+    const serializedGlobalClean = JSON.stringify(
+      clearGlobalForLockScreen(global, false)
+    );
     localStorage.setItem(GLOBAL_STATE_CACHE_KEY, serializedGlobalClean);
 
     return;
@@ -253,32 +265,34 @@ export function serializeGlobal<T extends GlobalState>(global: T) {
   const reducedGlobal: GlobalState = {
     ...INITIAL_GLOBAL_STATE,
     ...pick(global, [
-      'appConfig',
-      'authState',
-      'authPhoneNumber',
-      'authRememberMe',
-      'authNearestCountry',
-      'currentUserId',
-      'contactList',
-      'topPeers',
-      'topInlineBots',
-      'recentEmojis',
-      'recentCustomEmojis',
-      'topReactions',
-      'recentReactions',
-      'push',
-      'serviceNotifications',
-      'attachmentSettings',
-      'leftColumnWidth',
-      'archiveSettings',
-      'mediaViewer',
-      'audioPlayer',
-      'shouldShowContextMenuHint',
-      'trustedBotIds',
-      'recentlyFoundChatIds',
-      'peerColors',
+      "appConfig",
+      "authState",
+      "authPhoneNumber",
+      "authRememberMe",
+      "authNearestCountry",
+      "currentUserId",
+      "contactList",
+      "topPeers",
+      "topInlineBots",
+      "recentEmojis",
+      "recentCustomEmojis",
+      "topReactions",
+      "recentReactions",
+      "push",
+      "serviceNotifications",
+      "attachmentSettings",
+      "leftColumnWidth",
+      "archiveSettings",
+      "mediaViewer",
+      "audioPlayer",
+      "shouldShowContextMenuHint",
+      "trustedBotIds",
+      "recentlyFoundChatIds",
+      "peerColors",
     ]),
-    lastIsChatInfoShown: !getIsMobile() ? global.lastIsChatInfoShown : undefined,
+    lastIsChatInfoShown: !getIsMobile()
+      ? global.lastIsChatInfoShown
+      : undefined,
     customEmojis: reduceCustomEmojis(global),
     users: reduceUsers(global),
     chats: reduceChats(global),
@@ -288,19 +302,24 @@ export function serializeGlobal<T extends GlobalState>(global: T) {
     groupCalls: reduceGroupCalls(global),
     availableReactions: reduceAvailableReactions(global),
     passcode: pick(global.passcode, [
-      'isScreenLocked',
-      'hasPasscode',
-      'invalidAttemptsCount',
-      'timeoutUntil',
+      "isScreenLocked",
+      "hasPasscode",
+      "invalidAttemptsCount",
+      "timeoutUntil",
     ]),
   };
 
   return JSON.stringify(reducedGlobal);
 }
 
-function reduceCustomEmojis<T extends GlobalState>(global: T): GlobalState['customEmojis'] {
+function reduceCustomEmojis<T extends GlobalState>(
+  global: T
+): GlobalState["customEmojis"] {
   const { lastRendered, byId } = global.customEmojis;
-  const idsToSave = lastRendered.slice(0, GLOBAL_STATE_CACHE_CUSTOM_EMOJI_LIMIT);
+  const idsToSave = lastRendered.slice(
+    0,
+    GLOBAL_STATE_CACHE_CUSTOM_EMOJI_LIMIT
+  );
   const byIdToSave = pick(byId, idsToSave);
 
   return {
@@ -312,31 +331,49 @@ function reduceCustomEmojis<T extends GlobalState>(global: T): GlobalState['cust
   };
 }
 
-function reduceUsers<T extends GlobalState>(global: T): GlobalState['users'] {
-  const { users: { byId, statusesById, fullInfoById }, currentUserId } = global;
+function reduceUsers<T extends GlobalState>(global: T): GlobalState["users"] {
+  const {
+    users: { byId, statusesById, fullInfoById },
+    currentUserId,
+  } = global;
   const currentChatIds = compact(
-    Object.values(global.byTabId)
-      .map(({ id: tabId }) => selectCurrentMessageList(global, tabId)),
-  ).map(({ chatId }) => chatId).filter((chatId) => isUserId(chatId));
+    Object.values(global.byTabId).map(({ id: tabId }) =>
+      selectCurrentMessageList(global, tabId)
+    )
+  )
+    .map(({ chatId }) => chatId)
+    .filter((chatId) => isUserId(chatId));
 
-  const visibleUserIds = unique(compact(Object.values(global.byTabId)
-    .flatMap(({ id: tabId }) => selectVisibleUsers(global, tabId)?.map((u) => u.id) || [])));
+  const visibleUserIds = unique(
+    compact(
+      Object.values(global.byTabId).flatMap(
+        ({ id: tabId }) =>
+          selectVisibleUsers(global, tabId)?.map((u) => u.id) || []
+      )
+    )
+  );
 
   const chatStoriesUserIds = currentChatIds
-    .flatMap((chatId) => Object.values(selectChatMessages(global, chatId) || {}))
-    .map((message) => message.content.storyData?.peerId || message.content.webPage?.story?.peerId)
+    .flatMap((chatId) =>
+      Object.values(selectChatMessages(global, chatId) || {})
+    )
+    .map(
+      (message) =>
+        message.content.storyData?.peerId ||
+        message.content.webPage?.story?.peerId
+    )
     .filter((id): id is string => Boolean(id) && isUserId(id));
 
   const idsToSave = unique([
-    ...currentUserId ? [currentUserId] : [],
+    ...(currentUserId ? [currentUserId] : []),
     ...currentChatIds,
     ...chatStoriesUserIds,
-    ...visibleUserIds || [],
-    ...global.topPeers.userIds || [],
-    ...getOrderedIds(ALL_FOLDER_ID)?.filter(isUserId) || [],
-    ...getOrderedIds(ARCHIVED_FOLDER_ID)?.filter(isUserId) || [],
-    ...global.contactList?.userIds || [],
-    ...global.recentlyFoundChatIds?.filter(isUserId) || [],
+    ...(visibleUserIds || []),
+    ...(global.topPeers.userIds || []),
+    ...(getOrderedIds(ALL_FOLDER_ID)?.filter(isUserId) || []),
+    ...(getOrderedIds(ARCHIVED_FOLDER_ID)?.filter(isUserId) || []),
+    ...(global.contactList?.userIds || []),
+    ...(global.recentlyFoundChatIds?.filter(isUserId) || []),
     ...Object.keys(byId),
   ]).slice(0, GLOBAL_STATE_CACHE_USER_LIST_LIMIT);
 
@@ -347,38 +384,55 @@ function reduceUsers<T extends GlobalState>(global: T): GlobalState['users'] {
   };
 }
 
-function reduceChats<T extends GlobalState>(global: T): GlobalState['chats'] {
-  const { chats: { byId }, currentUserId } = global;
+function reduceChats<T extends GlobalState>(global: T): GlobalState["chats"] {
+  const {
+    chats: { byId },
+    currentUserId,
+  } = global;
   const currentChatIds = compact(
-    Object.values(global.byTabId)
-      .map(({ id: tabId }): MessageList | undefined => {
+    Object.values(global.byTabId).map(
+      ({ id: tabId }): MessageList | undefined => {
         return selectCurrentMessageList(global, tabId);
-      }),
+      }
+    )
   ).map(({ chatId }) => chatId);
 
-  const messagesChatIds = compact(Object.values(global.byTabId).flatMap(({ id: tabId }) => {
-    const messageList = selectCurrentMessageList(global, tabId);
-    if (!messageList) return undefined;
+  const messagesChatIds = compact(
+    Object.values(global.byTabId).flatMap(({ id: tabId }) => {
+      const messageList = selectCurrentMessageList(global, tabId);
+      if (!messageList) return undefined;
 
-    const messages = selectChatMessages(global, messageList.chatId);
-    const viewportIds = selectViewportIds(global, messageList.chatId, messageList.threadId, tabId);
-    return viewportIds?.map((id) => {
-      const message = messages[id];
-      if (!message) return undefined;
-      const content = message.content;
-      const replyPeer = message.replyInfo?.type === 'message' && message.replyInfo.replyToPeerId;
-      return content.storyData?.peerId || content.webPage?.story?.peerId || replyPeer;
-    });
-  }));
+      const messages = selectChatMessages(global, messageList.chatId);
+      const viewportIds = selectViewportIds(
+        global,
+        messageList.chatId,
+        messageList.threadId,
+        tabId
+      );
+      return viewportIds?.map((id) => {
+        const message = messages[id];
+        if (!message) return undefined;
+        const content = message.content;
+        const replyPeer =
+          message.replyInfo?.type === "message" &&
+          message.replyInfo.replyToPeerId;
+        return (
+          content.storyData?.peerId ||
+          content.webPage?.story?.peerId ||
+          replyPeer
+        );
+      });
+    })
+  );
 
   const idsToSave = unique([
-    ...currentUserId ? [currentUserId] : [],
+    ...(currentUserId ? [currentUserId] : []),
     ...currentChatIds,
     ...messagesChatIds,
-    ...getOrderedIds(SAVED_FOLDER_ID) || [],
-    ...getOrderedIds(ALL_FOLDER_ID) || [],
-    ...getOrderedIds(ARCHIVED_FOLDER_ID) || [],
-    ...global.recentlyFoundChatIds || [],
+    ...(getOrderedIds(SAVED_FOLDER_ID) || []),
+    ...(getOrderedIds(ALL_FOLDER_ID) || []),
+    ...(getOrderedIds(ARCHIVED_FOLDER_ID) || []),
+    ...(global.recentlyFoundChatIds || []),
     ...Object.keys(byId),
   ]).slice(0, GLOBAL_STATE_CACHE_CHAT_LIST_LIMIT);
 
@@ -395,22 +449,26 @@ function reduceChats<T extends GlobalState>(global: T): GlobalState['chats'] {
   };
 }
 
-function reduceMessages<T extends GlobalState>(global: T): GlobalState['messages'] {
+function reduceMessages<T extends GlobalState>(
+  global: T
+): GlobalState["messages"] {
   const { currentUserId } = global;
-  const byChatId: GlobalState['messages']['byChatId'] = {};
+  const byChatId: GlobalState["messages"]["byChatId"] = {};
   const currentChatIds = compact(
-    Object.values(global.byTabId)
-      .map(({ id: tabId }) => selectCurrentMessageList(global, tabId)),
+    Object.values(global.byTabId).map(({ id: tabId }) =>
+      selectCurrentMessageList(global, tabId)
+    )
   ).map(({ chatId }) => chatId);
   const forumPanelChatIds = compact(
-    Object.values(global.byTabId)
-      .map(({ forumPanelChatId }) => forumPanelChatId),
+    Object.values(global.byTabId).map(
+      ({ forumPanelChatId }) => forumPanelChatId
+    )
   );
   const chatIdsToSave = unique([
     ...currentChatIds,
-    ...currentUserId ? [currentUserId] : [],
+    ...(currentUserId ? [currentUserId] : []),
     ...forumPanelChatIds,
-    ...getOrderedIds(ALL_FOLDER_ID) || [],
+    ...(getOrderedIds(ALL_FOLDER_ID) || []),
   ]);
 
   chatIdsToSave.forEach((chatId) => {
@@ -422,31 +480,63 @@ function reduceMessages<T extends GlobalState>(global: T): GlobalState['messages
     const chat = selectChat(global, chatId);
     const chatLastMessageId = selectChatLastMessageId(global, chatId);
 
-    const threadIds = unique(compact(Object.values(global.byTabId).map(({ id: tabId }) => {
-      const { chatId: tabChatId, threadId } = selectCurrentMessageList(global, tabId) || {};
-      if (!tabChatId || tabChatId !== chatId || !threadId || threadId === MAIN_THREAD_ID) {
-        return undefined;
-      }
+    const threadIds = unique(
+      compact(
+        Object.values(global.byTabId)
+          .map(({ id: tabId }) => {
+            const { chatId: tabChatId, threadId } =
+              selectCurrentMessageList(global, tabId) || {};
+            if (
+              !tabChatId ||
+              tabChatId !== chatId ||
+              !threadId ||
+              threadId === MAIN_THREAD_ID
+            ) {
+              return undefined;
+            }
 
-      return threadId;
-    }).concat(
-      Object.values(global.messages.byChatId[chatId].threadsById || {})
-        .map(({ threadInfo }) => (threadInfo?.isCommentsInfo ? threadInfo?.originMessageId : undefined)),
-    )));
+            return threadId;
+          })
+          .concat(
+            Object.values(
+              global.messages.byChatId[chatId].threadsById || {}
+            ).map(({ threadInfo }) =>
+              threadInfo?.isCommentsInfo
+                ? threadInfo?.originMessageId
+                : undefined
+            )
+          )
+      )
+    );
 
-    const threadsToSave = pickTruthy(current.threadsById, [MAIN_THREAD_ID, ...threadIds]);
+    const threadsToSave = pickTruthy(current.threadsById, [
+      MAIN_THREAD_ID,
+      ...threadIds,
+    ]);
     if (!Object.keys(threadsToSave).length) {
       return;
     }
 
-    const viewportIdsToSave = unique(Object.values(threadsToSave).flatMap((thread) => thread.lastViewportIds || []));
-    const topicLastMessageIds = chat?.topics ? Object.values(chat.topics).map(({ lastMessageId }) => lastMessageId)
+    const viewportIdsToSave = unique(
+      Object.values(threadsToSave).flatMap(
+        (thread) => thread.lastViewportIds || []
+      )
+    );
+    const topicLastMessageIds = chat?.topics
+      ? Object.values(chat.topics).map(({ lastMessageId }) => lastMessageId)
       : [];
-    const savedLastMessageIds = chatId === currentUserId && global.chats.lastMessageIds.saved
-      ? Object.values(global.chats.lastMessageIds.saved) : [];
-    const lastMessageIdsToSave = [chatLastMessageId].concat(topicLastMessageIds).concat(savedLastMessageIds)
+    const savedLastMessageIds =
+      chatId === currentUserId && global.chats.lastMessageIds.saved
+        ? Object.values(global.chats.lastMessageIds.saved)
+        : [];
+    const lastMessageIdsToSave = [chatLastMessageId]
+      .concat(topicLastMessageIds)
+      .concat(savedLastMessageIds)
       .filter(Boolean);
-    const byId = pick(current.byId, viewportIdsToSave.concat(lastMessageIdsToSave));
+    const byId = pick(
+      current.byId,
+      viewportIdsToSave.concat(lastMessageIdsToSave)
+    );
     const threadsById = Object.keys(threadsToSave).reduce((acc, key) => {
       const thread = threadsToSave[Number(key)];
       acc[Number(key)] = {
@@ -456,7 +546,7 @@ function reduceMessages<T extends GlobalState>(global: T): GlobalState['messages
         typingStatus: undefined,
       };
       return acc;
-    }, {} as GlobalState['messages']['byChatId'][string]['threadsById']);
+    }, {} as GlobalState["messages"]["byChatId"][string]["threadsById"]);
 
     byChatId[chatId] = {
       byId,
@@ -470,7 +560,9 @@ function reduceMessages<T extends GlobalState>(global: T): GlobalState['messages
   };
 }
 
-function reduceSettings<T extends GlobalState>(global: T): GlobalState['settings'] {
+function reduceSettings<T extends GlobalState>(
+  global: T
+): GlobalState["settings"] {
   const { byKey, themes, performance } = global.settings;
 
   return {
@@ -482,13 +574,17 @@ function reduceSettings<T extends GlobalState>(global: T): GlobalState['settings
   };
 }
 
-function reduceChatFolders<T extends GlobalState>(global: T): GlobalState['chatFolders'] {
+function reduceChatFolders<T extends GlobalState>(
+  global: T
+): GlobalState["chatFolders"] {
   return {
     ...global.chatFolders,
   };
 }
 
-function reduceGroupCalls<T extends GlobalState>(global: T): GlobalState['groupCalls'] {
+function reduceGroupCalls<T extends GlobalState>(
+  global: T
+): GlobalState["groupCalls"] {
   return {
     ...global.groupCalls,
     byId: {},
@@ -496,7 +592,10 @@ function reduceGroupCalls<T extends GlobalState>(global: T): GlobalState['groupC
   };
 }
 
-function reduceAvailableReactions(global: GlobalState): GlobalState['availableReactions'] {
-  return global.availableReactions
-    ?.map((r) => pick(r, ['reaction', 'staticIcon', 'title', 'isInactive']));
+function reduceAvailableReactions(
+  global: GlobalState
+): GlobalState["availableReactions"] {
+  return global.availableReactions?.map((r) =>
+    pick(r, ["reaction", "staticIcon", "title", "isInactive"])
+  );
 }

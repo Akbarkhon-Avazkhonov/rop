@@ -1,30 +1,37 @@
-import './util/handleError';
-import './util/setupServiceWorker';
-import './global/init';
+/* eslint-disable eqeqeq */
+import "./util/handleError";
+import "./util/setupServiceWorker";
+import "./global/init";
 
-import React from './lib/teact/teact';
-import TeactDOM from './lib/teact/teact-dom';
+import React from "./lib/teact/teact";
+import TeactDOM from "./lib/teact/teact-dom";
+import { getActions, getGlobal } from "./global";
+
 import {
-  getActions, getGlobal,
-} from './global';
-
+  DEBUG,
+  MULTITAB_LOCALSTORAGE_KEY,
+  STRICTERDOM_ENABLED,
+} from "./config";
+import { enableStrict, requestMutation } from "./lib/fasterdom/fasterdom";
+import { selectTabState } from "./global/selectors";
+import { betterView } from "./util/betterView";
 import {
-  DEBUG, MULTITAB_LOCALSTORAGE_KEY, STRICTERDOM_ENABLED,
-} from './config';
-import { enableStrict, requestMutation } from './lib/fasterdom/fasterdom';
-import { selectTabState } from './global/selectors';
-import { betterView } from './util/betterView';
-import { establishMultitabRole, subscribeToMasterChange } from './util/establishMultitabRole';
-import { requestGlobal, subscribeToMultitabBroadcastChannel } from './util/multitab';
-import { checkAndAssignPermanentWebVersion } from './util/permanentWebVersion';
-import { onBeforeUnload } from './util/schedulers';
-import updateWebmanifest from './util/updateWebmanifest';
-import { IS_MULTITAB_SUPPORTED } from './util/windowEnvironment';
+  establishMultitabRole,
+  subscribeToMasterChange,
+} from "./util/establishMultitabRole";
+import {
+  requestGlobal,
+  subscribeToMultitabBroadcastChannel,
+} from "./util/multitab";
+import { checkAndAssignPermanentWebVersion } from "./util/permanentWebVersion";
+import { onBeforeUnload } from "./util/schedulers";
+import updateWebmanifest from "./util/updateWebmanifest";
+import { IS_MULTITAB_SUPPORTED } from "./util/windowEnvironment";
 
-import App from './components/App';
+import App from "./components/App";
 
-import './assets/fonts/roboto.css';
-import './styles/index.scss';
+import "./assets/fonts/roboto.css";
+import "./styles/index.scss";
 
 if (STRICTERDOM_ENABLED) {
   enableStrict();
@@ -32,10 +39,24 @@ if (STRICTERDOM_ENABLED) {
 
 init();
 
+// function listener(event) {
+//   if (event.origin != "http://localhost:2345") {
+//     localStorage.setItem("isCompatTestPassed", event.data);
+//     window.location.reload();
+//     return;
+//   }
+// }
+
+// if (window.addEventListener) {
+//   window.addEventListener("message", listener);
+// } else {
+//   // IE8
+//   window.attachEvent("onmessage", listener);
+// }
 async function init() {
   if (DEBUG) {
     // eslint-disable-next-line no-console
-    console.log('>>> INIT');
+    console.log(">>> INIT");
   }
 
   if (!(window as any).isCompatTestPassed) return;
@@ -48,7 +69,7 @@ async function init() {
     subscribeToMultitabBroadcastChannel();
 
     await requestGlobal(APP_VERSION);
-    localStorage.setItem(MULTITAB_LOCALSTORAGE_KEY, '1');
+    localStorage.setItem(MULTITAB_LOCALSTORAGE_KEY, "1");
     onBeforeUnload(() => {
       const global = getGlobal();
       if (Object.keys(global.byTabId).length === 1) {
@@ -66,38 +87,37 @@ async function init() {
   if (IS_MULTITAB_SUPPORTED) {
     establishMultitabRole();
     subscribeToMasterChange((isMasterTab) => {
-      getActions()
-        .switchMultitabRole({ isMasterTab }, { forceSyncOnIOs: true });
+      getActions().switchMultitabRole(
+        { isMasterTab },
+        { forceSyncOnIOs: true }
+      );
     });
   }
 
   if (DEBUG) {
     // eslint-disable-next-line no-console
-    console.log('>>> START INITIAL RENDER');
+    console.log(">>> START INITIAL RENDER");
   }
 
   requestMutation(() => {
     updateWebmanifest();
 
-    TeactDOM.render(
-      <App />,
-      document.getElementById('root')!,
-    );
+    TeactDOM.render(<App />, document.getElementById("root")!);
 
     betterView();
   });
 
   if (DEBUG) {
     // eslint-disable-next-line no-console
-    console.log('>>> FINISH INITIAL RENDER');
+    console.log(">>> FINISH INITIAL RENDER");
   }
 
   if (DEBUG) {
-    document.addEventListener('dblclick', () => {
+    document.addEventListener("dblclick", () => {
       // eslint-disable-next-line no-console
-      console.warn('TAB STATE', selectTabState(getGlobal()));
+      console.warn("TAB STATE", selectTabState(getGlobal()));
       // eslint-disable-next-line no-console
-      console.warn('GLOBAL STATE', getGlobal());
+      console.warn("GLOBAL STATE", getGlobal());
     });
   }
 }

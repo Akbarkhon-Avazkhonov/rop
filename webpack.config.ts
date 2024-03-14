@@ -60,9 +60,11 @@ export default function createConfig(
     mode,
     entry: './src/index.tsx',
     target: 'web',
-
+    performance: {
+      hints: false,
+    },
     devServer: {
-      port: 1234,
+      port: 2345,
       host: '0.0.0.0',
       allowedHosts: 'all',
       hot: false,

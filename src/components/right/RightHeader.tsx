@@ -477,7 +477,7 @@ const RightHeader: FC<OwnProps & StateProps> = ({
         return <h3 className="title">{lang('ChannelSubscribers')}</h3>;
       case HeaderContent.MemberList:
       case HeaderContent.ManageGroupMembers:
-        return <h3 className="title">{lang('GroupMembers')}</h3>;
+        return <h3 className="title">Operators</h3>;
       case HeaderContent.StoryList:
         return <h3 className="title">{lang(isSelf ? 'Settings.MyStories' : 'PeerInfo.PaneStories')}</h3>;
       case HeaderContent.SavedDialogs:

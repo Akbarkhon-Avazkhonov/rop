@@ -116,7 +116,7 @@ type StateProps = {
   currentUserId?: string;
   isLeftColumnOpen: boolean;
   isMiddleColumnOpen: boolean;
-  isRightColumnOpen: boolean;
+  isRightColumnOpen: boolean ;
   isMediaViewerOpen: boolean;
   isStoryViewerOpen: boolean;
   isForwardModalOpen: boolean;

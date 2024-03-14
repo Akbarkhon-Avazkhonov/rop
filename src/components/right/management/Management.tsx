@@ -221,7 +221,7 @@ const Management: FC<OwnProps & StateProps> = ({
       return (
         <ManageGroupMembers
           chatId={chatId}
-          isActive={isActive}
+          isActive
           onClose={onClose}
         />
       );

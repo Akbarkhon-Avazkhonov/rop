@@ -527,6 +527,7 @@ function LeftColumn({
             isElectronUpdateAvailable={isElectronUpdateAvailable}
             isForumPanelOpen={isForumPanelOpen}
             onTopicSearch={handleTopicSearch}
+    
           />
         );
     }
@@ -544,6 +545,7 @@ function LeftColumn({
       wrapExceptionKey={ContentType.Main}
       id="LeftColumn"
       withSwipeControl
+    
     >
       {renderContent}
     </Transition>

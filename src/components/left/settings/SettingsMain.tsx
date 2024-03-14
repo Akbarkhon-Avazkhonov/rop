@@ -147,48 +147,6 @@ const SettingsMain: FC<OwnProps & StateProps> = ({
           {lang('StickersName')}
         </ListItem>
       </div>
-      <div className="settings-main-menu">
-        {canBuyPremium && (
-          <ListItem
-            leftElement={<PremiumIcon className="icon" withGradient big />}
-            className="settings-main-menu-premium"
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={() => openPremiumModal()}
-          >
-            {lang('TelegramPremium')}
-          </ListItem>
-        )}
-      </div>
-      <div className="settings-main-menu">
-        <ListItem
-          icon="ask-support"
-          onClick={openSupportDialog}
-        >
-          {lang('AskAQuestion')}
-        </ListItem>
-        <ListItem
-          icon="help"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => openUrl({ url: FAQ_URL })}
-        >
-          {lang('TelegramFaq')}
-        </ListItem>
-        <ListItem
-          icon="privacy-policy"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => openUrl({ url: PRIVACY_URL })}
-        >
-          {lang('PrivacyPolicy')}
-        </ListItem>
-      </div>
-      <ConfirmDialog
-        isOpen={isSupportDialogOpen}
-        confirmLabel={lang('lng_settings_ask_ok')}
-        title={lang('AskAQuestion')}
-        text={lang('lng_settings_ask_sure')}
-        confirmHandler={handleOpenSupport}
-        onClose={closeSupportDialog}
-      />
     </div>
   );
 };
